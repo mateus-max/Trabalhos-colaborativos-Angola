@@ -256,7 +256,7 @@ function renderExcelGrid(){
  document.querySelectorAll("[data-xinput]").forEach(input=>{
   input.onfocus=()=>selectExcelCell(input.dataset.xinput);
   input.onkeydown=async e=>{
-   const addr=input.dataset.xinput,m=addr.match(/^([A-Z]+)(\\d+)$/);if(!m)return;
+   const addr=input.dataset.xinput,m=addr.match(/^([A-Z]+)(\d+)$/);if(!m)return;
    const col=excelCol(m[1]),row=Number(m[2]);let target=null;
    if(e.key==="Enter"||e.key==="ArrowDown")target=excelCell(Math.min(3000,row+1),col);
    else if(e.key==="ArrowUp")target=excelCell(Math.max(1,row-1),col);
@@ -291,7 +291,7 @@ async function shiftExcelCells(axis,at,delta){
  const sh=currentSheet();if(!sh||!activeWorkbookId||!activeSheetId)return;
  const cells={},entries=Object.entries(sh.cells||{});
  for(const [addr,cell] of entries){
-  const m=addr.match(/^([A-Z]+)(\\d+)$/);if(!m)continue;
+  const m=addr.match(/^([A-Z]+)(\d+)$/);if(!m)continue;
   let row=Number(m[2]),col=excelCol(m[1]);
   if(axis==="row"&&row>=at)row+=delta;
   if(axis==="column"&&col>=at)col+=delta;
@@ -301,8 +301,8 @@ async function shiftExcelCells(axis,at,delta){
  await set(ref(db,path()+"/spreadsheets/"+activeWorkbookId+"/sheets/"+activeSheetId+"/cells"),cells);
  sh.cells=cells;renderExcelGrid();
 }
-$("excelInsertRow").onclick=async()=>{const m=selectedExcelCell.match(/^([A-Z]+)(\\d+)$/);if(!m)return;const row=Number(m[2]);if(row>=3000)return alert("Limite de 3.000 linhas atingido.");if(confirm("Inserir uma linha abaixo da linha "+row+"?")){try{await shiftExcelCells("row",row+1,1)}catch(e){error(e)}}};
-$("excelInsertColumn").onclick=async()=>{const m=selectedExcelCell.match(/^([A-Z]+)(\\d+)$/);if(!m)return;const col=excelCol(m[1]);if(col>=1000)return alert("Limite de 1.000 colunas atingido.");if(confirm("Inserir uma coluna à direita da coluna "+m[1]+"?")){try{await shiftExcelCells("column",col+1,1)}catch(e){error(e)}}};
+$("excelInsertRow").onclick=async()=>{const m=selectedExcelCell.match(/^([A-Z]+)(\d+)$/);if(!m)return;const row=Number(m[2]);if(row>=3000)return alert("Limite de 3.000 linhas atingido.");if(confirm("Inserir uma linha abaixo da linha "+row+"?")){try{await shiftExcelCells("row",row+1,1)}catch(e){error(e)}}};
+$("excelInsertColumn").onclick=async()=>{const m=selectedExcelCell.match(/^([A-Z]+)(\d+)$/);if(!m)return;const col=excelCol(m[1]);if(col>=1000)return alert("Limite de 1.000 colunas atingido.");if(confirm("Inserir uma coluna à direita da coluna "+m[1]+"?")){try{await shiftExcelCells("column",col+1,1)}catch(e){error(e)}}};
 $("excelClearCell").onclick=()=>{if(!selectedExcelCell)return;saveExcelCell(selectedExcelCell,"")};
 
 function parseDelimitedText(text){const first=(text.split(/\r?\n/,1)[0]||"");const candidates=[",",";","\\t"];let delimiter=candidates.sort((a,b)=>first.split(b).length-first.split(a).length)[0];let rows=[],row=[],field="",quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++}else quoted=!quoted}else if(ch===delimiter&&!quoted){row.push(field);field=""}else if((ch==="\n"||ch==="\r")&&!quoted){if(ch==="\r"&&text[i+1]==="\n")i++;row.push(field);rows.push(row);row=[];field=""}else field+=ch}if(field!==""||row.length){row.push(field);rows.push(row)}return rows}
