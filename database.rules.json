@@ -31,8 +31,10 @@
         },
         "notifications": {
           "$recipientUid": {
-            ".write": "auth != null && root.child('workspaces').child($projectId).child('members').child(auth.uid).exists()",
-            ".validate": "newData.child('createdBy').val() === auth.uid"
+            "$notificationId": {
+              ".write": "auth != null && root.child('workspaces').child($projectId).child('members').child(auth.uid).exists()",
+              ".validate": "newData.child('createdBy').val() === auth.uid"
+            }
           }
         }
       }
