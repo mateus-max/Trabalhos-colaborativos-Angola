@@ -88,75 +88,7 @@ $("insertTable").onclick=()=>{if(!docId)return;let rows=Math.min(10,Math.max(1,N
 $("docImageInput").onchange=async e=>{let file=e.target.files?.[0];if(!file||!docId)return;if(!file.type.startsWith("image/")||file.size>5*1024*1024){alert("Escolha uma imagem até 5 MB.");e.target.value="";return}try{$("saveState").textContent="A carregar imagem…";let ext=(file.name.split(".").pop()||"jpg").replace(/[^a-z0-9]/gi,"");let up=await uploadBytes(sref(storage,"workspaces/"+active+"/documents/"+docId+"/"+Date.now()+"."+ext),file);let url=await getDownloadURL(up.ref);$("docBody").focus();document.execCommand("insertHTML",false,'<img src="'+url+'" alt="'+esc(file.name)+'">');saveDoc()}catch(err){error(err)}e.target.value=""};
 $("duplicateDoc").onclick=async()=>{if(!docId)return;let d=docs[docId];let r=push(ref(db,path()+"/documents"));await set(r,{...d,title:(d.title||"Documento")+" (cópia)",createdBy:user.uid,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});loadDoc(r.key)};
 $("deleteDoc").onclick=async()=>{if(!docId||!confirm("Eliminar este documento? Esta ação não pode ser desfeita."))return;await remove(ref(db,path()+"/documents/"+docId));docId=null;loadDoc("");renderDocs()};
-function exportDocHtml(){return '<!doctype html><html><head><meta charset="utf-8"><title>'+esc($("docTitle").value)+'</title><style>body{font:12pt Arial;line-height:1.6;margin:2.5cm}img{max-width:100%}table{border-collapse:collapse;width:100%}td,th{border:1px solid #777;padding:7px}
-/* Final document editor visual system */
-#p-docs .head{display:flex;flex-direction:row;align-items:center;gap:20px;margin-bottom:24px}
-#p-docs .head>div{min-width:0}
-#p-docs .head button{width:auto;white-space:nowrap;flex-shrink:0}
-#p-docs .head h1{font-size:clamp(26px,2.4vw,36px);letter-spacing:-.7px;color:#173b60}
-#p-docs .head .muted{font-size:16px;margin-top:7px;color:#71849b}
-#p-docs .doc-workspace{padding:22px;background:#fff;border:1px solid #dce6f2;border-radius:22px;box-shadow:0 12px 34px rgba(22,55,86,.07);overflow:hidden}
-#p-docs .doc-topbar{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;align-items:center;gap:12px;margin:0 0 18px}
-#p-docs .doc-topbar select{height:48px;min-width:0;width:100%;border:1px solid #dce6f2;border-radius:12px;background:#fff;padding:0 16px;font-size:15px;color:#172f49}
-#p-docs .doc-mode{padding:11px 15px;border-radius:24px;background:#edf5fc;color:#2c6595;font-size:13px;font-weight:750}
-#p-docs #saveState{padding:9px 14px;border-radius:24px;background:#eaf7f0;color:#12845a;font-size:13px;white-space:nowrap}
-#p-docs .doc-paper{padding:24px;background:#f2f6fb;border:1px solid #e0e9f3;border-radius:19px}
-#p-docs .doc-paper-head{align-items:center;margin:2px 4px 20px}
-#p-docs .doc-kicker{font-size:11px;letter-spacing:1.8px;color:#8297ad}
-#p-docs .doc-paper-head h2{font-size:25px;letter-spacing:-.45px;color:#183b5d}
-#p-docs .doc-live-indicator{padding:9px 14px;font-size:13px;white-space:nowrap}
-#p-docs .doc-toolbar-shell{display:grid;grid-template-columns:1fr;gap:12px;padding:14px 16px;margin:0 0 18px;background:#fff;border:1px solid #dce6f2;border-radius:16px;box-shadow:0 4px 14px rgba(25,59,91,.035)}
-#p-docs .doc-toolbar-group{display:flex;align-items:center;gap:8px;min-height:42px;flex-wrap:wrap}
-#p-docs .doc-toolbar-label{width:82px;min-width:82px;font-size:11px;letter-spacing:1.05px;color:#8297ad}
-#p-docs .doc-tool{height:42px;min-width:42px;padding:9px 13px!important;border:1px solid transparent;border-radius:11px;background:#edf3f9;color:#173b60;font-size:14px;font-weight:700;transition:background .15s,border-color .15s,transform .15s}
-#p-docs .doc-tool:hover{background:#dfeaf5;border-color:#cbdced;transform:translateY(-1px)}
-#p-docs .doc-toolbar-group select{height:42px;max-width:180px;min-width:100px;padding:0 13px;border:1px solid #dce6f2;border-radius:11px;background:#fff;color:#18334e;font-size:14px}
-#p-docs .doc-toolbar-group select#docFontName{min-width:160px}
-#p-docs .doc-color-control{height:42px;padding:5px 10px;border:1px solid #dce6f2;border-radius:11px;background:#f8fafc;font-size:16px}
-#p-docs .doc-color-control input{width:27px;height:27px}
-#p-docs .doc-image-label{height:42px;min-width:94px;justify-content:center;padding:9px 13px!important}
-#p-docs .doc-page-stage{padding:18px 12px 26px;background:#eaf0f7;border:1px solid #dce5ef;border-radius:14px;overflow:auto}
-#p-docs .doc-sheet{width:min(100%,980px);min-height:850px;margin:0 auto;padding:48px 64px 70px;background:#fff;border:1px solid #e0e6ed;border-radius:3px;box-shadow:0 7px 25px rgba(24,47,70,.12)}
-#p-docs .doc-title-field{display:block;width:100%;height:auto;min-height:52px;margin:0 0 18px;padding:8px 0;border:0;border-bottom:1px solid #e6ebf1;border-radius:0;background:transparent;color:#142e49;font-size:25px;font-weight:650;letter-spacing:-.35px;box-shadow:none}
-#p-docs .doc-title-field:focus{outline:none;border-bottom-color:#8bbbe4;box-shadow:0 1px 0 #8bbbe4}
-#p-docs .doc-title-field:disabled{opacity:1;color:#253c54}
-#p-docs .rich-editor{width:100%;max-width:none;min-height:660px;max-height:none;margin:0;padding:10px 0 40px;border:0;border-radius:0;background:#fff;box-shadow:none;resize:vertical;overflow:auto;color:#26384a;font-family:Arial,sans-serif;font-size:15px;line-height:1.8}
-#p-docs .rich-editor:focus{border:0;outline:none;box-shadow:none}
-#p-docs .rich-editor:empty:before{content:attr(data-placeholder);color:#98a7b7;pointer-events:none}
-#p-docs .rich-editor h1{font-size:30px}#p-docs .rich-editor h2{font-size:24px}#p-docs .rich-editor h3{font-size:19px}
-#p-docs .doc-actions{margin-top:18px;padding-top:15px;border-top:1px solid #e0e8f0}
-#p-docs .doc-actions button{min-height:38px;border-radius:10px}
-#p-docs .doc-note{margin-top:14px;color:#7a8da2}
-#p-docs .doc-conflict{margin-bottom:15px}
-@media(max-width:1050px){
- #p-docs .doc-sheet{padding:36px 42px 55px}
- #p-docs .doc-toolbar-label{width:72px;min-width:72px}
-}
-@media(max-width:760px){
- #p-docs .head{flex-direction:column;align-items:stretch}
- #p-docs .head button{width:100%}
- #p-docs .doc-workspace{padding:10px;border-radius:15px}
- #p-docs .doc-topbar{grid-template-columns:1fr auto;gap:8px}
- #p-docs .doc-topbar select{grid-column:1/-1;height:44px}
- #p-docs .doc-mode{font-size:11px;padding:8px 10px}
- #p-docs .doc-paper{padding:11px}
- #p-docs .doc-paper-head{gap:10px;align-items:flex-start;margin:4px 2px 13px}
- #p-docs .doc-paper-head h2{font-size:20px}
- #p-docs .doc-live-indicator{font-size:10px;padding:7px 9px}
- #p-docs .doc-toolbar-shell{padding:10px;gap:10px}
- #p-docs .doc-toolbar-group{gap:6px}
- #p-docs .doc-toolbar-label{width:100%;min-width:100%;margin:0 0 2px}
- #p-docs .doc-tool{height:38px;min-width:38px;padding:7px 10px!important}
- #p-docs .doc-toolbar-group select{height:38px;max-width:145px;min-width:85px;font-size:12px}
- #p-docs .doc-toolbar-group select#docFontName{min-width:125px}
- #p-docs .doc-page-stage{padding:8px 5px}
- #p-docs .doc-sheet{width:100%;min-height:650px;padding:25px 18px 40px}
- #p-docs .doc-title-field{font-size:21px}
- #p-docs .rich-editor{min-height:520px;padding:8px 0 30px;font-size:15px}
- #p-docs .doc-actions{gap:6px}
- #p-docs .doc-actions button{font-size:11px}
-}
-</style></head><body><h1>'+esc($("docTitle").value)+'</h1>'+$("docBody").innerHTML+'</body></html>'}
+function exportDocHtml(){return '<!doctype html><html><head><meta charset="utf-8"><title>'+esc($("docTitle").value)+'</title><style>body{font:12pt Arial,sans-serif;line-height:1.6;margin:2.5cm}img{max-width:100%;height:auto}table{border-collapse:collapse;width:100%}td,th{border:1px solid #777;padding:7px}</style></head><body><h1>'+esc($("docTitle").value)+'</h1>'+$("docBody").innerHTML+'</body></html>'}
 $("exportDocWord").onclick=()=>{if(!docId)return;let blob=new Blob(["\ufeff",exportDocHtml()],{type:"application/msword"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=($("docTitle").value||"documento")+".doc";a.click();URL.revokeObjectURL(url)};
 $("exportDocPdf").onclick=()=>{if(!docId)return;let w=window.open("","_blank");if(!w){alert("Permita janelas de impressão para exportar o PDF.");return}w.document.write(exportDocHtml());w.document.close();w.focus();setTimeout(()=>w.print(),300)};
 
