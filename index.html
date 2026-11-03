@@ -491,9 +491,14 @@ $("docImportInput").onchange=async e=>{
  try{
   const ext=(file.name.split(".").pop()||"").toLowerCase();let html="",title=file.name.replace(/\.(docx|html?|txt)$/i,"");
   if(ext==="docx"){
-   await loadOfficeLibrary("mammoth","https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js");
-   const converted=await mammoth.convertToHtml({arrayBuffer:await file.arrayBuffer()});html=converted.value||"<p><br></p>";
-   if(converted.messages?.length)console.info("Avisos ao importar Word:",converted.messages);
+   await loadOfficeLibrary("docxPreview","https://cdn.jsdelivr.net/npm/docx-preview@0.3.6/dist/docx-preview.min.js");
+   const cssLink=document.createElement("link");cssLink.rel="stylesheet";cssLink.href="https://cdn.jsdelivr.net/npm/docx-preview@0.3.6/dist/docx-preview.min.css";document.head.appendChild(cssLink);
+   const temp=document.createElement("div"),styleHost=document.createElement("div");temp.style.cssText="position:fixed;left:-20000px;top:0;width:1100px;visibility:hidden";document.body.appendChild(temp);document.head.appendChild(styleHost);
+   try{
+    await docx.renderAsync(await file.arrayBuffer(),temp,styleHost,{className:"docx-imported",inWrapper:true,ignoreWidth:false,ignoreHeight:false,ignoreFonts:false,breakPages:true,renderHeaders:true,renderFooters:true,renderFootnotes:true,renderEndnotes:true});
+    const inlineStyles=node=>{if(node.nodeType!==1)return;const computed=getComputedStyle(node);const props=["font-family","font-size","font-weight","font-style","text-decoration","color","background-color","text-align","vertical-align","line-height","margin","padding","border","border-top","border-right","border-bottom","border-left","width","height","min-height","max-width","white-space","list-style-type","page-break-after","break-after","box-sizing"];for(const prop of props){const value=computed.getPropertyValue(prop);if(value&&value!=="normal"&&value!=="rgba(0, 0, 0, 0)")node.style.setProperty(prop,value)}Array.from(node.children).forEach(inlineStyles)};
+    Array.from(temp.children).forEach(inlineStyles);html=temp.innerHTML||"<p><br></p>";
+   }finally{temp.remove();styleHost.remove()}
   }else if(ext==="html"||ext==="htm"){html=await file.text()}
   else if(ext==="txt"){html="<p>"+esc(await file.text()).replace(/\r?\n/g,"</p><p>")+"</p>"}
   else throw new Error("Formato não suportado. Guarde o documento antigo .doc como .docx e tente novamente.");
