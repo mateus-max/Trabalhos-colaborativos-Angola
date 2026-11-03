@@ -328,7 +328,7 @@ async function saveExcelCell(addr,value,record=true){
 async function applyExcelHistory(entry,useAfter){
  const sh=workbooks?.[entry.bookId]?.sheets?.[entry.sheetId];if(!sh)return;
  const value=useAfter?entry.after:entry.before,cellRef=ref(db,path()+"/spreadsheets/"+entry.bookId+"/sheets/"+entry.sheetId+"/cells/"+entry.addr);
- try{if(value===null){await remove(cellRef);delete sh.cells[entry.addr]}else{await set(cellRef,value);sh.cells=sh.cells||{};sh.cells[entry.addr]=JSON.parse(JSON.stringify(value))}
+ try{if(entry.type==="sheet"){const cellsRef=ref(db,path()+"/spreadsheets/"+entry.bookId+"/sheets/"+entry.sheetId+"/cells"),snapshot=JSON.parse(JSON.stringify(value||{}));await set(cellsRef,snapshot);sh.cells=snapshot}else if(value===null){await remove(cellRef);delete sh.cells[entry.addr]}else{await set(cellRef,value);sh.cells=sh.cells||{};sh.cells[entry.addr]=JSON.parse(JSON.stringify(value))}
  if(activeWorkbookId===entry.bookId&&activeSheetId===entry.sheetId)renderExcelGrid();$("excelSaveState").textContent=useAfter?"Acção refeita":"Acção desfeita"
  }catch(e){(useAfter?excelRedoHistory:excelHistory).push(entry);error(e)}
 }
@@ -336,7 +336,7 @@ async function undoExcel(){const entry=excelHistory.pop();if(!entry)return;excel
 async function redoExcel(){const entry=excelRedoHistory.pop();if(!entry)return;excelHistory.push(entry);await applyExcelHistory(entry,true)}
 
 $("excelApply").onclick=()=>saveExcelCell(selectedExcelCell,$("excelFormula").value);
-$("excelFormula").onkeydown=e=>{if(e.key==="Enter")$("excelApply").click()};$("excelUndo").onclick=undoExcel;$("excelRedo").onclick=redoExcel;$("excelGridBody").addEventListener("paste",async e=>{const clip=e.clipboardData?.getData("text/plain");if(!clip||!activeWorkbookId||!activeSheetId)return;const rows=clip.replace(/\r/g,"").split("\n").filter((line,i,a)=>line!==""||i<a.length-1).map(line=>line.split("\t"));if(rows.length===1&&rows[0].length===1)return;e.preventDefault();const m=selectedExcelCell.match(/^([A-Z]+)(\d+)$/);if(!m)return;const baseCol=excelCol(m[1]),baseRow=Number(m[2]),patch={};rows.forEach((row,ri)=>row.forEach((value,ci)=>{const rr=baseRow+ri,cc=baseCol+ci;if(rr<=3000&&cc<=1000){const addr=excelCell(rr,cc);patch[addr]={...(currentSheet()?.cells?.[addr]||{}),value}}}));try{await update(ref(db,path()+"/spreadsheets/"+activeWorkbookId+"/sheets/"+activeSheetId+"/cells"),patch);$("excelSaveState").textContent="Bloco colado e guardado"}catch(err){error(err)}});$("excelGridScroll").addEventListener("scroll",()=>{const sc=$("excelGridScroll"),sh=currentSheet(),nextRow=excelFindRow(sh,sc.scrollTop),nextCol=excelFindColumn(sh,sc.scrollLeft);if(nextRow===excelStartRow&&nextCol===excelStartCol)return;excelStartRow=nextRow;excelStartCol=nextCol;if(excelRenderTimer)cancelAnimationFrame(excelRenderTimer);excelRenderTimer=requestAnimationFrame(()=>{excelRenderTimer=null;renderExcelGrid()})},{passive:true});
+$("excelFormula").onkeydown=e=>{if(e.key==="Enter")$("excelApply").click()};$("excelUndo").onclick=undoExcel;$("excelRedo").onclick=redoExcel;$("excelGridBody").addEventListener("paste",async e=>{const clip=e.clipboardData?.getData("text/plain");if(!clip||!activeWorkbookId||!activeSheetId)return;const rows=clip.replace(/\r/g,"").split("\n").filter((line,i,a)=>line!==""||i<a.length-1).map(line=>line.split("\t"));if(rows.length===1&&rows[0].length===1)return;e.preventDefault();const m=selectedExcelCell.match(/^([A-Z]+)(\d+)$/);if(!m)return;const baseCol=excelCol(m[1]),baseRow=Number(m[2]),patch={},sh=currentSheet(),bookId=activeWorkbookId,sheetId=activeSheetId,before=JSON.parse(JSON.stringify(sh?.cells||{}));rows.forEach((row,ri)=>row.forEach((value,ci)=>{const rr=baseRow+ri,cc=baseCol+ci;if(rr<=3000&&cc<=1000){const addr=excelCell(rr,cc);patch[addr]={...(sh?.cells?.[addr]||{}),value}}}));try{await update(ref(db,path()+"/spreadsheets/"+bookId+"/sheets/"+sheetId+"/cells"),patch);sh.cells={...sh.cells,...patch};excelHistory.push({type:"sheet",bookId,sheetId,before,after:JSON.parse(JSON.stringify(sh.cells))});if(excelHistory.length>200)excelHistory.shift();excelRedoHistory=[];$("excelSaveState").textContent="Bloco colado e guardado";renderExcelGrid()}catch(err){error(err)}});$("excelGridScroll").addEventListener("scroll",()=>{const sc=$("excelGridScroll"),sh=currentSheet(),nextRow=excelFindRow(sh,sc.scrollTop),nextCol=excelFindColumn(sh,sc.scrollLeft);if(nextRow===excelStartRow&&nextCol===excelStartCol)return;excelStartRow=nextRow;excelStartCol=nextCol;if(excelRenderTimer)cancelAnimationFrame(excelRenderTimer);excelRenderTimer=requestAnimationFrame(()=>{excelRenderTimer=null;renderExcelGrid()})},{passive:true});
 
 async function createExcelBook(title,seed){if(!active)return alert("Abra primeiro um projecto.");const r=push(ref(db,path()+"/spreadsheets"));const data=seed||{sheets:{sheet1:{name:"Planilha1",cells:{}}}};data.title=title;data.createdBy=user.uid;data.createdAt=Date.now();await set(r,data);activeWorkbookId=r.key;activeSheetId=Object.keys(data.sheets||{})[0]||null;resetExcelViewport();renderExcelBooks();$("excelSaveState").textContent="Livro criado e guardado"}
 $("excelNewBook").onclick=()=>createExcelBook("Novo livro de trabalho");
@@ -360,7 +360,7 @@ $("excelAlignLeft").onclick=()=>applyExcelStyle("align","left");$("excelAlignCen
 $("excelCurrency").onclick=()=>applyExcelStyle("format","currency");$("excelPercent").onclick=()=>applyExcelStyle("format","percent");$("excelBorders").onclick=()=>applyExcelStyle("border","1px solid #8b9bab");
 async function shiftExcelCells(axis,at,delta){
  const sh=currentSheet();if(!sh||!activeWorkbookId||!activeSheetId)return;
- const cells={},entries=Object.entries(sh.cells||{});
+ const before=JSON.parse(JSON.stringify(sh.cells||{})),cells={},entries=Object.entries(sh.cells||{});
  for(const [addr,cell] of entries){
   const m=addr.match(/^([A-Z]+)(\d+)$/);if(!m)continue;
   let row=Number(m[2]),col=excelCol(m[1]);
@@ -370,7 +370,7 @@ async function shiftExcelCells(axis,at,delta){
   cells[excelCell(row,col)]=cell;
  }
  await set(ref(db,path()+"/spreadsheets/"+activeWorkbookId+"/sheets/"+activeSheetId+"/cells"),cells);
- sh.cells=cells;renderExcelGrid();
+ excelHistory.push({type:"sheet",bookId:activeWorkbookId,sheetId:activeSheetId,before,after:JSON.parse(JSON.stringify(cells))});if(excelHistory.length>200)excelHistory.shift();excelRedoHistory=[];sh.cells=cells;renderExcelGrid();
 }
 $("excelInsertRow").onclick=async()=>{const m=selectedExcelCell.match(/^([A-Z]+)(\d+)$/);if(!m)return;const row=Number(m[2]);if(row>=3000)return alert("Limite de 3.000 linhas atingido.");if(confirm("Inserir uma linha abaixo da linha "+row+"?")){try{await shiftExcelCells("row",row+1,1)}catch(e){error(e)}}};
 $("excelInsertColumn").onclick=async()=>{const m=selectedExcelCell.match(/^([A-Z]+)(\d+)$/);if(!m)return;const col=excelCol(m[1]);if(col>=1000)return alert("Limite de 1.000 colunas atingido.");if(confirm("Inserir uma coluna à direita da coluna "+m[1]+"?")){try{await shiftExcelCells("column",col+1,1)}catch(e){error(e)}}};
@@ -505,7 +505,7 @@ $("docImportInput").onchange=async e=>{
   const ext=(file.name.split(".").pop()||"").toLowerCase();let html="",title=file.name.replace(/\.(docx|html?|txt)$/i,"");
   if(ext==="docx"){
    await loadOfficeLibrary("docxPreview","https://cdn.jsdelivr.net/npm/docx-preview@0.3.6/dist/docx-preview.min.js");
-   const cssLink=document.createElement("link");cssLink.rel="stylesheet";cssLink.href="https://cdn.jsdelivr.net/npm/docx-preview@0.3.6/dist/docx-preview.min.css";document.head.appendChild(cssLink);
+   const cssLink=document.createElement("link");cssLink.rel="stylesheet";cssLink.href="https://cdn.jsdelivr.net/npm/docx-preview@0.3.6/dist/docx-preview.min.css";document.head.appendChild(cssLink);await new Promise((resolve,reject)=>{cssLink.onload=resolve;cssLink.onerror=()=>reject(new Error("Não foi possível carregar os estilos de pré-visualização do Word."))});
    const temp=document.createElement("div"),styleHost=document.createElement("div");temp.style.cssText="position:fixed;left:-20000px;top:0;width:1100px;visibility:hidden";document.body.appendChild(temp);document.head.appendChild(styleHost);
    try{
     await docx.renderAsync(await file.arrayBuffer(),temp,styleHost,{className:"docx-imported",inWrapper:true,ignoreWidth:false,ignoreHeight:false,ignoreFonts:false,breakPages:true,renderHeaders:true,renderFooters:true,renderFootnotes:true,renderEndnotes:true});
@@ -520,7 +520,7 @@ $("docImportInput").onchange=async e=>{
   let targetId=docId;
   if(!targetId){
    const rnew=push(ref(db,path()+"/documents"));const data={title,body:"",bodyHtml:"<p><br></p>",pageLayout:{size:"A4",orientation:"portrait"},revision:0,createdBy:user.uid,createdAt:Date.now(),updatedAt:Date.now()};
-   await set(rnew,data);targetId=rnew.key;docs[targetId]=data;docId=targetId;docRevision=0;
+   await set(rnew,data);targetId=rnew.key;docs[targetId]=data;docId=targetId;docRevision=0;docUndoStack=[];docRedoStack=[];docHistoryCurrent=null;docHistoryLastAt=0;
   }
   $("docTitle").value=title;$("docBody").innerHTML=safeDocHtml(html);$("docBody").contentEditable=true;docDirty=true;saveDoc();renderDocs();$("saveState").textContent="Documento importado; a guardar…";
  }catch(err){alert(err.message||"Não foi possível importar o documento.");error(err)}finally{e.target.value=""}
