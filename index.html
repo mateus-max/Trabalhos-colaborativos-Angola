@@ -150,7 +150,7 @@
   <select id="excelFont"><option>Calibri</option><option>Arial</option><option>Times New Roman</option><option>Verdana</option></select><select id="excelSize"><option>10</option><option selected>11</option><option>12</option><option>14</option><option>16</option><option>18</option><option>24</option></select>
   <button data-xstyle="bold"><b>B</b></button><button data-xstyle="italic"><i>I</i></button><button data-xstyle="underline"><u>U</u></button><button id="excelAlignLeft">☰</button><button id="excelAlignCenter">≡</button><button id="excelAlignRight">☷</button>
   <label title="Cor do texto">A<input type="color" id="excelTextColor" value="#172b45"></label><label title="Cor de preenchimento">▰<input type="color" id="excelFillColor" value="#fff2a8"></label>
-  <button id="excelCurrency">Kz</button><button id="excelPercent">%</button><button id="excelBorders">▦</button><button id="excelAutoSum" title="Somar as células acima">Σ AutoSoma</button><label class="office-import-button">⇧ Importar CSV<input id="excelImportInput" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" hidden></label>
+  <button id="excelCurrency">Kz</button><button id="excelPercent">%</button><button id="excelBorders">▦</button><button id="excelAutoSum" title="Somar as células acima">Σ AutoSoma</button><label class="office-import-button">⇧ Importar Excel / CSV<input id="excelImportInput" type="file" accept=".xlsx,.xls,.csv,.tsv,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden></label>
  </div>
  <div class="excel-formula"><span id="excelNameBox">A1</span><span>fx</span><input id="excelFormula" placeholder="Introduza um valor ou fórmula (ex.: =SOMA(C3:C7))"><button id="excelApply">✓</button></div>
  <div class="excel-grid-scroll" id="excelGridScroll"><div id="excelGridSpace" class="excel-grid-space"></div><table class="excel-grid" id="excelGrid"><thead id="excelGridHead"></thead><tbody id="excelGridBody"></tbody></table></div>
@@ -210,6 +210,7 @@ function selectProject(id){projectUnsubs.forEach(stop=>stop());projectUnsubs=[];
 function showProject(){ $("projectModal").classList.add("show")};document.querySelectorAll(".newproject").forEach(b=>b.onclick=showProject);$("cancelProject").onclick=()=>$("projectModal").classList.remove("show");
 $("saveProject").onclick=async()=>{let name=$("projectName").value.trim();if(!name)return $("projectError").textContent="Indique o nome.";try{let r=push(ref(db,"workspaces"));await set(r,{name,description:$("projectDesc").value,createdBy:user.uid,createdByEmail:user.email,createdAt:serverTimestamp(),members:{[safe(user.uid)]:{email:user.email,role:"owner"}}});await set(ref(db,"userWorkspaces/"+safe(user.uid)+"/"+r.key),true);$("projectModal").classList.remove("show");$("projectName").value="";$("projectDesc").value="";selectProject(r.key)}catch(e){error(e)}};
 
+const officeLibraryPromises={};function loadOfficeLibrary(name,url){if(officeLibraryPromises[name])return officeLibraryPromises[name];officeLibraryPromises[name]=new Promise((resolve,reject)=>{const el=document.createElement("script");el.src=url;el.async=true;el.onload=resolve;el.onerror=()=>{delete officeLibraryPromises[name];reject(new Error("Não foi possível carregar o módulo Office. Verifique a ligação à Internet."))};document.head.appendChild(el)});return officeLibraryPromises[name]}
 /* Collaborative spreadsheet workspace */
 const excelLetters=n=>{let x="",v=n;while(v>0){let r=(v-1)%26;x=String.fromCharCode(65+r)+x;v=Math.floor((v-1)/26)}return x};
 const excelCol=n=>{let v=0;for(const c of n)v=v*26+c.charCodeAt(0)-64;return v};
@@ -288,10 +289,49 @@ $("excelAlignLeft").onclick=()=>applyExcelStyle("align","left");$("excelAlignCen
 $("excelCurrency").onclick=()=>applyExcelStyle("format","currency");$("excelPercent").onclick=()=>applyExcelStyle("format","percent");$("excelBorders").onclick=()=>applyExcelStyle("border","1px solid #8b9bab");
 
 function parseDelimitedText(text){const first=(text.split(/\r?\n/,1)[0]||"");const candidates=[",",";","\\t"];let delimiter=candidates.sort((a,b)=>first.split(b).length-first.split(a).length)[0];let rows=[],row=[],field="",quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++}else quoted=!quoted}else if(ch===delimiter&&!quoted){row.push(field);field=""}else if((ch==="\n"||ch==="\r")&&!quoted){if(ch==="\r"&&text[i+1]==="\n")i++;row.push(field);rows.push(row);row=[];field=""}else field+=ch}if(field!==""||row.length){row.push(field);rows.push(row)}return rows}
-$("excelImportInput").onchange=async e=>{const file=e.target.files?.[0];if(!file||!activeWorkbookId||!activeSheetId){e.target.value="";return}try{const rows=parseDelimitedText(await file.text()).slice(0,3000);if(rows.some(row=>row.length>1000))throw new Error("O ficheiro excede 1.000 colunas.");if(Object.keys(currentSheet()?.cells||{}).length&&!confirm("A importação vai substituir os dados da folha actual. Deseja continuar?"))return;const cells={};rows.forEach((row,ri)=>row.slice(0,1000).forEach((value,ci)=>{if(value!=="")cells[excelCell(ri+1,ci+1)]={value:/^-?\d+(?:[.,]\d+)?$/.test(value.trim())?Number(value.replace(",",".")):value}}));await set(ref(db,path()+"/spreadsheets/"+activeWorkbookId+"/sheets/"+activeSheetId+"/cells"),cells);await update(ref(db,path()+"/spreadsheets/"+activeWorkbookId+"/sheets/"+activeSheetId),{name:file.name.replace(/\.(csv|tsv)$/i,"").slice(0,40)||"Dados importados"});excelStartRow=0;excelStartCol=0;selectedExcelCell="A1";$("excelSaveState").textContent="Dados importados e guardados"}catch(err){alert(err.message||"Não foi possível importar o ficheiro.");error(err)}finally{e.target.value=""}};
+$("excelImportInput").onchange=async e=>{
+ const file=e.target.files?.[0];if(!file||!activeWorkbookId||!activeSheetId){e.target.value="";return}
+ try{
+  const ext=(file.name.split(".").pop()||"").toLowerCase(),sheets={};
+  if(ext==="xlsx"||ext==="xls"){
+   await loadOfficeLibrary("xlsx","https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js");
+   const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});
+   for(const name of wb.SheetNames.slice(0,30)){
+    const src=wb.Sheets[name],range=XLSX.utils.decode_range(src["!ref"]||"A1"),cells={};
+    for(let r=Math.max(0,range.s.r);r<=Math.min(2999,range.e.r);r++)for(let c=Math.max(0,range.s.c);c<=Math.min(999,range.e.c);c++){
+     const cell=src[XLSX.utils.encode_cell({r,c})];if(!cell)continue;
+     const value=cell.f?"="+cell.f:(cell.v??"");if(value!=="")cells[excelCell(r+1,c+1)]={value};
+    }
+    const id="sheet_"+Math.random().toString(36).slice(2,10);sheets[id]={name:name.slice(0,40),cells};
+   }
+  }else{
+   const rows=parseDelimitedText(await file.text()).slice(0,3000);
+   if(rows.some(row=>row.length>1000))throw new Error("O ficheiro excede 1.000 colunas.");
+   const cells={};rows.forEach((row,ri)=>row.slice(0,1000).forEach((v,ci)=>{if(v!=="")cells[excelCell(ri+1,ci+1)]={value:/^-?\d+(?:[.,]\d+)?$/.test(v.trim())?Number(v.replace(",",".")):v}}));
+   sheets[activeSheetId]={name:file.name.replace(/\.(csv|tsv)$/i,"").slice(0,40)||"Dados importados",cells};
+  }
+  if(!Object.keys(sheets).length)throw new Error("O ficheiro não contém folhas reconhecíveis.");
+  if(Object.values(currentWorkbook()?.sheets||{}).some(sh=>Object.keys(sh.cells||{}).length)&&!confirm("A importação vai substituir as folhas deste livro. Deseja continuar?"))return;
+  const title=file.name.replace(/\.(xlsx|xls|csv|tsv)$/i,"").slice(0,80)||"Livro importado";
+  await update(ref(db,path()+"/spreadsheets/"+activeWorkbookId),{sheets,title});
+  workbooks[activeWorkbookId]={...currentWorkbook(),sheets,title};activeSheetId=Object.keys(sheets)[0];selectedExcelCell="A1";resetExcelViewport();renderExcelBooks();$("excelSaveState").textContent="Livro importado e guardado";
+ }catch(err){alert(err.message||"Não foi possível importar o ficheiro.");error(err)}finally{e.target.value=""}
+};
 $("excelExportCsv").onclick=()=>{let sh=currentSheet();if(!sh)return;let range=excelUsedRange(sh),rows=[];for(let r=1;r<=range.rows;r++){let vals=[];for(let c=1;c<=range.cols;c++){let v=excelValue(sh.cells?.[excelCell(r,c)]||{});vals.push('"'+String(v??"").replace(/"/g,'""')+'"')}rows.push(vals.join(";"))}let blob=new Blob(["\ufeff"+rows.join("\r\n")],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=(currentWorkbook()?.title||"livro")+".csv";a.click();URL.revokeObjectURL(url)};
-$("excelExportXlsx").disabled=false;$("excelExportXlsx").textContent="Descarregar Excel (.xls)";
-$("excelExportXlsx").onclick=()=>{let sh=currentSheet();if(!sh)return;let range=excelUsedRange(sh),html='<html><head><meta charset="utf-8"></head><body><table border="1">'+Array.from({length:range.rows},(_,ri)=>'<tr>'+Array.from({length:range.cols},(_,ci)=>'<td>'+esc(excelValue(sh.cells?.[excelCell(ri+1,ci+1)]||{}))+'</td>').join("")+'</tr>').join("")+'</table></body></html>';let blob=new Blob(["\ufeff",html],{type:"application/vnd.ms-excel"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=(currentWorkbook()?.title||"livro")+".xls";a.click();URL.revokeObjectURL(url)};
+$("excelExportXlsx").disabled=false;$("excelExportXlsx").textContent="Descarregar Excel (.xlsx)";
+$("excelExportXlsx").onclick=async()=>{
+ const wbData=currentWorkbook();if(!wbData)return;
+ try{
+  await loadOfficeLibrary("xlsx","https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js");
+  const out=XLSX.utils.book_new();
+  for(const [id,sh] of Object.entries(wbData.sheets||{})){
+   const range=excelUsedRange(sh),rows=[];
+   for(let r=1;r<=range.rows;r++){const row=[];for(let c=1;c<=range.cols;c++){const raw=sh.cells?.[excelCell(r,c)]?.value??"";row.push(typeof raw==="string"&&raw.startsWith("=")?{f:raw.slice(1)}:raw)}rows.push(row)}
+   XLSX.utils.book_append_sheet(out,XLSX.utils.aoa_to_sheet(rows),(sh.name||id).slice(0,31));
+  }
+  XLSX.writeFile(out,(wbData.title||"livro").replace(/[\\/:*?"<>|]/g,"_")+".xlsx");
+ }catch(err){alert(err.message||"Não foi possível exportar Excel.");error(err)}
+};
 $("excelPrint").onclick=()=>window.print();
 
 document.querySelectorAll("#excelRibbon button").forEach(tab=>tab.onclick=()=>{document.querySelectorAll("#excelRibbon button").forEach(x=>x.classList.toggle("selected",x===tab));const name=tab.textContent.trim();$("excelCellStatus").textContent="Separador: "+name;if(name==="Base")$("excelFont").focus();else if(name==="Ficheiro"){const choice=prompt("FICHEIRO\n1 — Novo livro\n2 — Importar CSV\n3 — Exportar CSV\n4 — Imprimir / PDF","1");if(choice==="1")$("excelNewBook").click();if(choice==="2")$("excelImportInput").click();if(choice==="3")$("excelExportCsv").click();if(choice==="4")$("excelPrint").click()}else if(name==="Inserir")$("excelAddSheet").click();else if(name==="Fórmulas"){const m=selectedExcelCell.match(/^([A-Z]+)(\d+)$/);if(!m)return;const col=m[1],row=Number(m[2]);if(row<=1)return alert("Seleccione uma célula abaixo da linha que pretende somar.");const fn=prompt("Função: SOMA, MÉDIA, MIN, MAX ou CONTAR","SOMA");if(!fn)return;const allowed=["SOMA","MÉDIA","MIN","MAX","CONTAR"];if(!allowed.includes(fn.toUpperCase()))return alert("Função não disponível.");saveExcelCell(selectedExcelCell,"="+fn.toUpperCase()+"("+col+"1:"+col+Math.max(1,row-1)+")")}else if(name==="Dados")$("excelImportInput").click();else if(name==="Ver")$("excelGridScroll").classList.toggle("excel-hide-gridlines");else if(name==="Colaboração")document.querySelector(".office-collab")?.scrollIntoView({behavior:"smooth",block:"nearest"});else $("excelCellStatus").textContent="Separador "+name+" · ferramentas disponíveis na barra principal"});
