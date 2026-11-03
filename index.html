@@ -125,44 +125,7 @@
 #p-docs .doc-toolbar-shell{display:flex;align-items:center;gap:12px;padding:5px 10px;margin:0;min-height:48px;overflow-x:auto;overflow-y:hidden;border-bottom:1px solid #dce4ed;scrollbar-width:thin}#p-docs .doc-toolbar-group{display:flex;align-items:center;gap:4px;flex:0 0 auto;flex-wrap:nowrap}#p-docs .doc-toolbar-label{display:none}#p-docs .doc-tool{height:30px;min-width:30px;padding:5px 7px!important;font-size:11px}#p-docs .doc-toolbar-group select{height:30px;min-width:60px;padding:4px 7px;font-size:11px}#p-docs .doc-color-control{height:30px;padding:3px 5px;font-size:11px}#p-docs .doc-color-control input{width:18px;height:18px}
 #p-docs .doc-page-stage{padding:8px 10px 14px;background:#e9edf3;max-height:calc(100vh - 250px);overflow:auto}#p-docs .doc-sheet{width:min(100%,210mm);min-height:calc(100vh - 300px);margin:0 auto;padding:15mm 17mm;box-shadow:0 2px 12px #152e4c18}#p-docs #docTitle{font-size:22px;margin-bottom:12px;padding-bottom:8px}#p-docs #docBody.rich-editor{min-height:calc(100vh - 430px);font-size:11pt;line-height:1.5}#p-docs .doc-actions{padding:6px 10px}#p-docs .word-status{padding:4px 10px;font-size:10px}
 #p-excel.page.active{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:0;align-items:start}#p-excel .office-app{width:100%;min-width:0}#p-excel .excel-titlebar{min-height:54px;height:54px;padding:6px 12px}#p-excel .office-filemark{width:34px;height:34px;font-size:19px}#p-excel .office-docname{font-size:15px}#p-excel .office-ribbon-tabs{height:36px}#p-excel .office-ribbon-tabs button{padding:0 11px;font-size:11px}#p-excel .office-toolbar{min-height:50px;padding:5px 8px;gap:5px;flex-wrap:wrap}#p-excel .office-toolbar button{min-height:30px;padding:5px 8px;font-size:11px}#p-excel .office-toolbar select{height:30px;padding:4px 6px;font-size:11px}#p-excel .excel-formula{height:38px}#p-excel .excel-grid-scroll{height:calc(100vh - 330px);min-height:390px}#p-excel .excel-grid th,#p-excel .excel-grid td{min-width:120px}
-#p-excel .office-collab{width:100%;min-height:0;max-height:205px;padding:9px 12px;border-radius:9px;display:grid;grid-template-columns:minmax(180px,.8fr) minmax(250px,1.2fr);grid-template-rows:auto 1fr auto;column-gap:12px;row-gap:5px;overflow:hidden}#p-excel .office-collab h3{margin:0;font-size:12px}#p-excel #excelMemberCountconst ext=(file.name.split(".").pop()||"").toLowerCase(),sheets={};
-  if(ext==="xlsx"){
-   await loadOfficeLibrary("exceljs","https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js");
-   const wb=new ExcelJS.Workbook();await wb.xlsx.load(await file.arrayBuffer());
-   const hex=c=>{let v=String(c?.argb||"");if(v.length===8)v=v.slice(2);return /^[0-9a-f]{6}$/i.test(v)?"#"+v:null};
-   const borderCss=x=>{if(!x?.style)return null;const styles={hair:"1px solid",thin:"1px solid",dotted:"1px dotted",dashed:"1px dashed",medium:"2px solid",thick:"3px solid",double:"3px double"};return (styles[x.style]||"1px solid")+" "+(hex(x.color)||"#8996a5")};
-   for(const ws of wb.worksheets.slice(0,30)){
-    const cells={},columnWidths={},rowHeights={};
-    ws.columns.forEach((col,i)=>{if(col.width)columnWidths[i+1]=col.width});
-    ws.eachRow({includeEmpty:false},row=>{if(row.height)rowHeights[row.number]=row.height});
-    ws.eachRow({includeEmpty:false},row=>row.eachCell({includeEmpty:false},cell=>{
-     const raw=cell.value;let value="";
-     if(raw&&typeof raw==="object"&&raw.formula)value="="+raw.formula;
-     else if(raw&&typeof raw==="object"&&raw.richText)value=raw.richText.map(x=>x.text||"").join("");
-     else if(raw&&typeof raw==="object"&&raw.text&&raw.hyperlink)value=raw.text;
-     else if(raw&&typeof raw==="object"&&raw.result!==undefined)value=raw.result;
-     else if(raw instanceof Date)value=raw.toISOString();
-     else if(raw!==null&&raw!==undefined)value=raw;
-     const f=cell.font||{},al=cell.alignment||{},fill=cell.fill||{},style={};
-     if(f.name)style.font=f.name;if(f.size)style.size=f.size;if(f.bold)style.bold=true;if(f.italic)style.italic=true;if(f.underline)style.underline=true;if(f.strike)style.strike=true;
-     const fontColor=hex(f.color);if(fontColor)style.color=fontColor;
-     if(fill.type==="pattern"&&fill.pattern==="solid"){const color=hex(fill.fgColor);if(color)style.fill=color}
-     if(al.horizontal)style.align=al.horizontal;if(al.vertical)style.vertical=al.vertical;if(al.wrapText)style.wrap=true;
-     for(const side of ["top","right","bottom","left"]){const border=borderCss(cell.border?.[side]);if(border)style["border"+side[0].toUpperCase()+side.slice(1)]=border}
-     if(cell.numFmt){style.numberFormat=cell.numFmt;if(cell.numFmt.includes("%"))style.format="percent";else if(/[€$£]|Kz/i.test(cell.numFmt))style.format="currency"}
-     if(value!==""&&value!==undefined)cells[excelCell(cell.row,cell.col)]={value,style};
-    }));
-    const id="sheet_"+Math.random().toString(36).slice(2,10);
-    sheets[id]={name:ws.name.slice(0,40)||"Planilha",cells,columnWidths,rowHeights,merges:ws.model?.merges||[]};
-   }
-  }else if(ext==="xls"){
-   throw new Error("O formato .xls antigo não permite preservar todos os estilos nesta importação. Abra o ficheiro no Excel e guarde-o como .xlsx para manter cores, fontes, tamanhos, bordas e formatos.");
-  }else{
-   const rows=parseDelimitedText(await file.text()).slice(0,3000);
-   if(rows.some(row=>row.length>1000))throw new Error("O ficheiro excede 1.000 colunas.");
-   const cells={};rows.forEach((row,ri)=>row.slice(0,1000).forEach((v,ci)=>{if(v!=="")cells[excelCell(ri+1,ci+1)]={value:/^-?\d+(?:[.,]\d+)?$/.test(v.trim())?Number(v.replace(",",".")):v}}));
-   sheets[activeSheetId]={name:file.name.replace(/\.(csv|tsv)$/i,"").slice(0,40)||"Dados importados",cells};
-  }e-stage{height:min(72vh,820px);min-height:420px;max-height:820px;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;display:flex;align-items:flex-start;justify-content:center;padding:18px;background:#e8edf3}
+#p-excel .office-collab{width:100%;min-height:0;max-height:205px;padding:9px 12px;border-radius:9px;display:grid;grid-template-columns:minmax(180px,.8fr) minmax(250px,1.2fr);grid-template-rows:auto 1fr auto;column-gap:12px;row-gap:5px;overflow:hidden}#p-excel .office-collab h3{margin:0;font-size:12px}#p-excel #excelMemberCount#p-docs .doc-page-stage{height:min(72vh,820px);min-height:420px;max-height:820px;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;display:flex;align-items:flex-start;justify-content:center;padding:18px;background:#e8edf3}
 #p-docs .doc-sheet{display:flex;flex-direction:column;flex:0 0 auto;width:210mm;height:297mm;min-height:0;max-height:none;overflow:hidden;margin:0 auto;padding:18mm 20mm;background:#fff;box-sizing:border-box}
 #p-docs #docTitle{display:block;flex:0 0 auto;width:100%}
 #p-docs #docBody.rich-editor{flex:1 1 auto;min-height:0;height:auto;max-height:none;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;resize:none}
@@ -381,17 +344,37 @@ $("excelImportInput").onchange=async e=>{
  const file=e.target.files?.[0];if(!file||!activeWorkbookId||!activeSheetId){e.target.value="";return}
  try{
   const ext=(file.name.split(".").pop()||"").toLowerCase(),sheets={};
-  if(ext==="xlsx"||ext==="xls"){
-   await loadOfficeLibrary("xlsx","https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js");
-   const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});
-   for(const name of wb.SheetNames.slice(0,30)){
-    const src=wb.Sheets[name],range=XLSX.utils.decode_range(src["!ref"]||"A1"),cells={};
-    for(let r=Math.max(0,range.s.r);r<=Math.min(2999,range.e.r);r++)for(let c=Math.max(0,range.s.c);c<=Math.min(999,range.e.c);c++){
-     const cell=src[XLSX.utils.encode_cell({r,c})];if(!cell)continue;
-     const value=cell.f?"="+cell.f:(cell.v??"");if(value!=="")cells[excelCell(r+1,c+1)]={value};
-    }
-    const id="sheet_"+Math.random().toString(36).slice(2,10);sheets[id]={name:name.slice(0,40),cells};
+  if(ext==="xlsx"){
+   await loadOfficeLibrary("exceljs","https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js");
+   const wb=new ExcelJS.Workbook();await wb.xlsx.load(await file.arrayBuffer());
+   const hex=c=>{let v=String(c?.argb||"");if(v.length===8)v=v.slice(2);return /^[0-9a-f]{6}$/i.test(v)?"#"+v:null};
+   const borderCss=x=>{if(!x?.style)return null;const styles={hair:"1px solid",thin:"1px solid",dotted:"1px dotted",dashed:"1px dashed",medium:"2px solid",thick:"3px solid",double:"3px double"};return (styles[x.style]||"1px solid")+" "+(hex(x.color)||"#8996a5")};
+   for(const ws of wb.worksheets.slice(0,30)){
+    const cells={},columnWidths={},rowHeights={};
+    ws.columns.forEach((col,i)=>{if(col.width)columnWidths[i+1]=col.width});
+    ws.eachRow({includeEmpty:false},row=>{if(row.height)rowHeights[row.number]=row.height});
+    ws.eachRow({includeEmpty:false},row=>row.eachCell({includeEmpty:false},cell=>{
+     const raw=cell.value;let value="";
+     if(raw&&typeof raw==="object"&&raw.formula)value="="+raw.formula;
+     else if(raw&&typeof raw==="object"&&raw.richText)value=raw.richText.map(x=>x.text||"").join("");
+     else if(raw&&typeof raw==="object"&&raw.text&&raw.hyperlink)value=raw.text;
+     else if(raw&&typeof raw==="object"&&raw.result!==undefined)value=raw.result;
+     else if(raw instanceof Date)value=raw.toISOString();
+     else if(raw!==null&&raw!==undefined)value=raw;
+     const f=cell.font||{},al=cell.alignment||{},fill=cell.fill||{},style={};
+     if(f.name)style.font=f.name;if(f.size)style.size=f.size;if(f.bold)style.bold=true;if(f.italic)style.italic=true;if(f.underline)style.underline=true;if(f.strike)style.strike=true;
+     const fontColor=hex(f.color);if(fontColor)style.color=fontColor;
+     if(fill.type==="pattern"&&fill.pattern==="solid"){const color=hex(fill.fgColor);if(color)style.fill=color}
+     if(al.horizontal)style.align=al.horizontal;if(al.vertical)style.vertical=al.vertical;if(al.wrapText)style.wrap=true;
+     for(const side of ["top","right","bottom","left"]){const border=borderCss(cell.border?.[side]);if(border)style["border"+side[0].toUpperCase()+side.slice(1)]=border}
+     if(cell.numFmt){style.numberFormat=cell.numFmt;if(cell.numFmt.includes("%"))style.format="percent";else if(/[€$£]|Kz/i.test(cell.numFmt))style.format="currency"}
+     if(value!==""&&value!==undefined)cells[excelCell(cell.row,cell.col)]={value,style};
+    }));
+    const id="sheet_"+Math.random().toString(36).slice(2,10);
+    sheets[id]={name:ws.name.slice(0,40)||"Planilha",cells,columnWidths,rowHeights,merges:ws.model?.merges||[]};
    }
+  }else if(ext==="xls"){
+   throw new Error("O formato .xls antigo não permite preservar todos os estilos nesta importação. Abra o ficheiro no Excel e guarde-o como .xlsx para manter cores, fontes, tamanhos, bordas e formatos.");
   }else{
    const rows=parseDelimitedText(await file.text()).slice(0,3000);
    if(rows.some(row=>row.length>1000))throw new Error("O ficheiro excede 1.000 colunas.");
