@@ -286,8 +286,12 @@ function renderExcelGrid(){
   for(let ci=0;ci<cols;ci++){
    const col=startC+ci,colPx=excelColumnWidth(sh,col),addr=excelCell(row,col),obj=sh.cells?.[addr]||{},value=excelValue(obj),style=obj.style||{};
    let displayValue=value;
-   if(style.format==="currency"&&value!==""&&Number.isFinite(Number(value)))displayValue=Number(value).toLocaleString("pt-PT")+" Kz";
-   if(style.format==="percent"&&value!==""&&Number.isFinite(Number(value)))displayValue=(Number(value)*100).toLocaleString("pt-PT")+"%";
+   if(value!==""&&Number.isFinite(Number(value))){
+    const numeric=Number(value),fmt=String(style.numberFormat||"");
+    if(style.format==="percent"||fmt.includes("%")){const decimals=(fmt.split(".")[1]||"").replace(/[^0#]/g,"").length;displayValue=(numeric*100).toLocaleString("pt-PT",{minimumFractionDigits:decimals,maximumFractionDigits:decimals})+"%"}
+    else if(style.format==="currency"||/[€$£]|Kz/i.test(fmt)){const decimals=(fmt.split(".")[1]||"").replace(/[^0#]/g,"").length;displayValue=numeric.toLocaleString("pt-PT",{minimumFractionDigits:decimals,maximumFractionDigits:decimals})+( /€/.test(fmt)?" €":/\$/.test(fmt)?" $":/£/.test(fmt)?" £":" Kz")}
+    else if(fmt&&/[0#]/.test(fmt)){const decimals=(fmt.split(".")[1]||"").replace(/[^0#]/g,"").length;displayValue=numeric.toLocaleString("pt-PT",{minimumFractionDigits:decimals,maximumFractionDigits:decimals,useGrouping:fmt.includes(",")})}
+   }else if(typeof value==="string"&&/^\d{4}-\d\d-\d\dT/.test(value)&&/d|m|y/i.test(String(style.numberFormat||""))){const date=new Date(value);if(!Number.isNaN(date.getTime()))displayValue=date.toLocaleDateString("pt-PT")}
    const css='font-family:'+esc(style.font||"Calibri")+';font-size:'+Number(style.size||11)+'pt;text-align:'+esc(style.align||"left")+';vertical-align:'+esc(style.vertical||"middle")+';white-space:'+(style.wrap?"normal":"nowrap")+';font-weight:'+(style.bold?"700":"400")+';font-style:'+(style.italic?"italic":"normal")+';text-decoration:'+(style.underline?"underline":style.strike?"line-through":"none")+';color:'+esc(style.color||"#172b45")+';background:'+esc(style.fill||"#ffffff")+';border-top:'+esc(style.borderTop||"1px solid #d9dfe6")+';border-right:'+esc(style.borderRight||"1px solid #d9dfe6")+';border-bottom:'+esc(style.borderBottom||"1px solid #d9dfe6")+';border-left:'+esc(style.borderLeft||"1px solid #d9dfe6")+';';
    body+='<td data-cell="'+addr+'" class="'+(String(obj.value||"").startsWith("=")?"formula-cell ":"")+(addr===selectedExcelCell?"selected":"")+'" style="width:'+colPx+'px;min-width:'+colPx+'px;max-width:'+colPx+'px;height:'+rowPx+'px;'+css+'"><input data-xinput="'+addr+'" value="'+esc(displayValue)+'" aria-label="'+addr+'"></td>';
   }
