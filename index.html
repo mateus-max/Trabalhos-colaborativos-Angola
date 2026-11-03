@@ -150,7 +150,7 @@
   <select id="excelFont"><option>Calibri</option><option>Arial</option><option>Times New Roman</option><option>Verdana</option></select><select id="excelSize"><option>10</option><option selected>11</option><option>12</option><option>14</option><option>16</option><option>18</option><option>24</option></select>
   <button data-xstyle="bold"><b>B</b></button><button data-xstyle="italic"><i>I</i></button><button data-xstyle="underline"><u>U</u></button><button id="excelAlignLeft">☰</button><button id="excelAlignCenter">≡</button><button id="excelAlignRight">☷</button>
   <label title="Cor do texto">A<input type="color" id="excelTextColor" value="#172b45"></label><label title="Cor de preenchimento">▰<input type="color" id="excelFillColor" value="#fff2a8"></label>
-  <button id="excelCurrency">Kz</button><button id="excelPercent">%</button><button id="excelBorders">▦</button><button id="excelAutoSum" title="Somar as células acima">Σ AutoSoma</button><label class="office-import-button">⇧ Importar Excel / CSV<input id="excelImportInput" type="file" accept=".xlsx,.xls,.csv,.tsv,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden></label>
+  <button id="excelCurrency">Kz</button><button id="excelPercent">%</button><button id="excelBorders">▦</button><button id="excelInsertRow" title="Inserir linha abaixo">＋ Linha</button><button id="excelInsertColumn" title="Inserir coluna à direita">＋ Coluna</button><button id="excelClearCell" title="Limpar conteúdo da célula">Limpar célula</button><button id="excelAutoSum" title="Somar as células acima">Σ AutoSoma</button><label class="office-import-button">⇧ Importar Excel / CSV<input id="excelImportInput" type="file" accept=".xlsx,.xls,.csv,.tsv,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden></label>
  </div>
  <div class="excel-formula"><span id="excelNameBox">A1</span><span>fx</span><input id="excelFormula" placeholder="Introduza um valor ou fórmula (ex.: =SOMA(C3:C7))"><button id="excelApply">✓</button></div>
  <div class="excel-grid-scroll" id="excelGridScroll"><div id="excelGridSpace" class="excel-grid-space"></div><table class="excel-grid" id="excelGrid"><thead id="excelGridHead"></thead><tbody id="excelGridBody"></tbody></table></div>
@@ -287,6 +287,23 @@ $("excelFont").onchange=e=>applyExcelStyle("font",e.target.value);$("excelSize")
 $("excelTextColor").oninput=e=>applyExcelStyle("color",e.target.value);$("excelFillColor").oninput=e=>applyExcelStyle("fill",e.target.value);
 $("excelAlignLeft").onclick=()=>applyExcelStyle("align","left");$("excelAlignCenter").onclick=()=>applyExcelStyle("align","center");$("excelAlignRight").onclick=()=>applyExcelStyle("align","right");
 $("excelCurrency").onclick=()=>applyExcelStyle("format","currency");$("excelPercent").onclick=()=>applyExcelStyle("format","percent");$("excelBorders").onclick=()=>applyExcelStyle("border","1px solid #8b9bab");
+async function shiftExcelCells(axis,at,delta){
+ const sh=currentSheet();if(!sh||!activeWorkbookId||!activeSheetId)return;
+ const cells={},entries=Object.entries(sh.cells||{});
+ for(const [addr,cell] of entries){
+  const m=addr.match(/^([A-Z]+)(\\d+)$/);if(!m)continue;
+  let row=Number(m[2]),col=excelCol(m[1]);
+  if(axis==="row"&&row>=at)row+=delta;
+  if(axis==="column"&&col>=at)col+=delta;
+  if(row<1||row>3000||col<1||col>1000)continue;
+  cells[excelCell(row,col)]=cell;
+ }
+ await set(ref(db,path()+"/spreadsheets/"+activeWorkbookId+"/sheets/"+activeSheetId+"/cells"),cells);
+ sh.cells=cells;renderExcelGrid();
+}
+$("excelInsertRow").onclick=async()=>{const m=selectedExcelCell.match(/^([A-Z]+)(\\d+)$/);if(!m)return;const row=Number(m[2]);if(row>=3000)return alert("Limite de 3.000 linhas atingido.");if(confirm("Inserir uma linha abaixo da linha "+row+"?")){try{await shiftExcelCells("row",row+1,1)}catch(e){error(e)}}};
+$("excelInsertColumn").onclick=async()=>{const m=selectedExcelCell.match(/^([A-Z]+)(\\d+)$/);if(!m)return;const col=excelCol(m[1]);if(col>=1000)return alert("Limite de 1.000 colunas atingido.");if(confirm("Inserir uma coluna à direita da coluna "+m[1]+"?")){try{await shiftExcelCells("column",col+1,1)}catch(e){error(e)}}};
+$("excelClearCell").onclick=()=>{if(!selectedExcelCell)return;saveExcelCell(selectedExcelCell,"")};
 
 function parseDelimitedText(text){const first=(text.split(/\r?\n/,1)[0]||"");const candidates=[",",";","\\t"];let delimiter=candidates.sort((a,b)=>first.split(b).length-first.split(a).length)[0];let rows=[],row=[],field="",quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++}else quoted=!quoted}else if(ch===delimiter&&!quoted){row.push(field);field=""}else if((ch==="\n"||ch==="\r")&&!quoted){if(ch==="\r"&&text[i+1]==="\n")i++;row.push(field);rows.push(row);row=[];field=""}else field+=ch}if(field!==""||row.length){row.push(field);rows.push(row)}return rows}
 $("excelImportInput").onchange=async e=>{
