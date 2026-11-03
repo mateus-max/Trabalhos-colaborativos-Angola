@@ -36,6 +36,9 @@
               ".validate": "newData.child('createdBy').val() === auth.uid"
             }
           }
+        },
+        "spreadsheets": {
+          ".write": "auth != null && root.child('workspaces').child($projectId).child('members').child(auth.uid).exists()"
         }
       }
     },
