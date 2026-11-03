@@ -2,7 +2,6 @@
   "rules": {
     ".read": false,
     ".write": false,
-
     "userWorkspaces": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
@@ -11,34 +10,33 @@
         }
       }
     },
-
     "workspaces": {
       "$projectId": {
         ".read": "auth != null && data.child('members').child(auth.uid).exists()",
         ".write": "auth != null && !data.exists() && newData.child('createdBy').val() === auth.uid && newData.child('members').child(auth.uid).child('role').val() === 'owner'",
-
         "members": {
           ".write": "auth != null && root.child('workspaces').child($projectId).child('createdBy').val() === auth.uid"
         },
-
         "documents": {
           ".write": "auth != null && root.child('workspaces').child($projectId).child('members').child(auth.uid).exists()"
         },
-
         "tasks": {
           ".write": "auth != null && root.child('workspaces').child($projectId).child('members').child(auth.uid).exists()"
         },
-
         "messages": {
           ".write": "auth != null && root.child('workspaces').child($projectId).child('members').child(auth.uid).exists()"
         },
-
         "files": {
           ".write": "auth != null && root.child('workspaces').child($projectId).child('members').child(auth.uid).exists()"
+        },
+        "notifications": {
+          "$recipientUid": {
+            ".write": "auth != null && root.child('workspaces').child($projectId).child('members').child(auth.uid).exists()",
+            ".validate": "newData.child('createdBy').val() === auth.uid"
+          }
         }
       }
     },
-
     "presence": {
       ".read": "auth != null",
       "$uid": {
